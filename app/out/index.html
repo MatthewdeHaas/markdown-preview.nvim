@@ -1,8 +1,13 @@
 <!DOCTYPE html><html><head><meta charSet="utf-8" class="next-head"/><title class="next-head"></title><link rel="shortcut icon" type="image/ico" href="/_static/favicon.ico" class="next-head"/><link rel="stylesheet" href="/_static/page.css" class="next-head"/><link rel="stylesheet" href="/_static/markdown.css" class="next-head"/><link rel="stylesheet" href="/_static/highlight.css" class="next-head"/><link rel="stylesheet" href="/_static/katex@0.15.3.css" class="next-head"/><link rel="stylesheet" href="/_static/sequence-diagram-min.css" class="next-head"/><script type="text/javascript" src="/_static/underscore-min.js" class="next-head"></script><script type="text/javascript" src="/_static/webfont.js" class="next-head"></script><script type="text/javascript" src="/_static/snap.svg.min.js" class="next-head"></script><script type="text/javascript" src="/_static/tweenlite.min.js" class="next-head"></script><script type="text/javascript" src="/_static/mermaid.min.js" class="next-head"></script><script type="text/javascript" src="/_static/sequence-diagram-min.js" class="next-head"></script><script type="text/javascript" src="/_static/katex@0.15.3.js" class="next-head"></script><script type="text/javascript" src="/_static/mhchem.min.js" class="next-head"></script><script type="text/javascript" src="/_static/raphael@2.3.0.min.js" class="next-head"></script><script type="text/javascript" src="/_static/flowchart@1.13.0.min.js" class="next-head"></script><script type="text/javascript" src="/_static/viz.js" class="next-head"></script><script type="text/javascript" src="/_static/full.render.js" class="next-head"></script><link rel="preload" href="/_next/static/s7O4q0ISzv1r8jtwIkXLb/pages/index.js" as="script"/><link rel="preload" href="/_next/static/s7O4q0ISzv1r8jtwIkXLb/pages/_app.js" as="script"/><link rel="preload" href="/_next/static/s7O4q0ISzv1r8jtwIkXLb/pages/_error.js" as="script"/><link rel="preload" href="/_next/static/runtime/webpack-2ef50c24cc8d478adafc.js" as="script"/><link rel="preload" href="/_next/static/chunks/commons.eb02219a61ab5016dbbe.js" as="script"/><link rel="preload" href="/_next/static/runtime/main-3978781480e8c13aefab.js" as="script"/><script>(function () {
-  var VERSION = "1.9.0"; // replace with a current version
+  var VERSION = "1.9.0";
   var BASE = "https://cdn.jsdelivr.net/npm/@coderline/alphatab@" + VERSION + "/dist/";
-  var SELECTOR = "pre > code.language-alphatex";
   var loading = null;
+
+  function findBlocks() {
+    return Array.prototype.filter.call(document.querySelectorAll("pre > code"), function (code) {
+      return /^\s*!tab\b/.test(code.textContent);
+    });
+  }
 
   function loadAlphaTab() {
     if (window.alphaTab) return Promise.resolve();
@@ -11,7 +16,7 @@
         var s = document.createElement("script");
         s.src = BASE + "alphaTab.min.js";
         s.onload = resolve;
-        s.onerror = reject;
+        s.onerror = function () { console.error("[alphatex] failed to load", s.src); reject(); };
         document.head.appendChild(s);
       });
     }
@@ -19,17 +24,25 @@
   }
 
   function render() {
-    if (!document.querySelector(SELECTOR)) return;
+    var blocks = findBlocks();
+    if (!blocks.length) return;
+    console.log("[alphatex] found", blocks.length, "block(s)");
     loadAlphaTab().then(function () {
-      document.querySelectorAll(SELECTOR).forEach(function (code) {
+      findBlocks().forEach(function (code) {
+        var tex = code.textContent.replace(/^\s*!tab[^\n]*\n?/, "");
         var pre = code.parentElement;
         var holder = document.createElement("div");
         holder.className = "alphatab-score";
         pre.replaceWith(holder);
-        var api = new alphaTab.AlphaTabApi(holder, {
-          core: { fontDirectory: BASE + "font/", useWorkers: false },
-        });
-        api.tex(code.textContent);
+        try {
+          var api = new alphaTab.AlphaTabApi(holder, {
+            core: { fontDirectory: BASE + "font/", useWorkers: false },
+          });
+          api.error.on(function (e) { console.error("[alphatex] render error", e); });
+          api.tex(tex);
+        } catch (e) {
+          console.error("[alphatex] exception", e);
+        }
       });
     });
   }
@@ -41,10 +54,8 @@
   }
 
   function start() {
-    new MutationObserver(schedule).observe(document.body, {
-      childList: true,
-      subtree: true,
-    });
+    console.log("[alphatex] loaded");
+    new MutationObserver(schedule).observe(document.body, { childList: true, subtree: true });
     schedule();
   }
 
